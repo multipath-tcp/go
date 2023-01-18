@@ -621,6 +621,10 @@ type ListenConfig struct {
 	// that do not support keep-alives ignore this field.
 	// If negative, keep-alives are disabled.
 	KeepAlive time.Duration
+
+	// If UseMultipathTCP is set, any call to Listen with "tcp(4|6)" as network
+	// will use Multipath TCP (MPTCP) if supported by the operating system.
+	UseMultipathTCP bool
 }
 
 // Listen announces on the local network address.
@@ -641,7 +645,11 @@ func (lc *ListenConfig) Listen(ctx context.Context, network, address string) (Li
 	la := addrs.first(isIPv4)
 	switch la := la.(type) {
 	case *TCPAddr:
-		l, err = sl.listenTCP(ctx, la)
+		if sl.UseMultipathTCP {
+			l, err = sl.listenMPTCP(ctx, la)
+		} else {
+			l, err = sl.listenTCP(ctx, la)
+		}
 	case *UnixAddr:
 		l, err = sl.listenUnix(ctx, la)
 	default:
