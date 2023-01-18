@@ -1,1 +1,2 @@
 pkg net, type Dialer struct, UseMultipathTCP bool #56539
+pkg net, type ListenConfig struct, UseMultipathTCP bool #56539
