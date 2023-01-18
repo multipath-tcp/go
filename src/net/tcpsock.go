@@ -217,6 +217,15 @@ func (c *TCPConn) SetNoDelay(noDelay bool) error {
 	return nil
 }
 
+// MultipathTCP returns whether the ongoing connection is using
+// Multipath TCP.
+func (c *TCPConn) MultipathTCP() (bool, error) {
+	if !c.ok() {
+		return false, syscall.EINVAL
+	}
+	return useMultipathTCP(c.fd), nil
+}
+
 func newTCPConn(fd *netFD, keepAlive time.Duration, keepAliveHook func(time.Duration)) *TCPConn {
 	setNoDelay(fd, true)
 	if keepAlive == 0 {
