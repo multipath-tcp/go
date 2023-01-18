@@ -6,6 +6,10 @@
 
 package net
 
-func supportsMultipathTCP() bool {
-	return false
+import (
+	"context"
+)
+
+func (sd *sysDialer) dialMPTCP(ctx context.Context, laddr, raddr *TCPAddr) (*TCPConn, error) {
+	return sd.dialTCP(ctx, laddr, raddr)
 }

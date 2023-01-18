@@ -108,6 +108,10 @@ type Dialer struct {
 	//
 	// If ControlContext is not nil, Control is ignored.
 	ControlContext func(ctx context.Context, network, address string, c syscall.RawConn) error
+
+	// If UseMultipathTCP is set, any call to Dial with "tcp(4|6)" as network will
+	// use Multipath TCP (MPTCP) if supported by the operating system.
+	UseMultipathTCP bool
 }
 
 func (d *Dialer) dualStack() bool { return d.FallbackDelay >= 0 }
@@ -577,7 +581,11 @@ func (sd *sysDialer) dialSingle(ctx context.Context, ra Addr) (c Conn, err error
 	switch ra := ra.(type) {
 	case *TCPAddr:
 		la, _ := la.(*TCPAddr)
-		c, err = sd.dialTCP(ctx, la, ra)
+		if sd.UseMultipathTCP {
+			c, err = sd.dialMPTCP(ctx, la, ra)
+		} else {
+			c, err = sd.dialTCP(ctx, la, ra)
+		}
 	case *UDPAddr:
 		la, _ := la.(*UDPAddr)
 		c, err = sd.dialUDP(ctx, la, ra)
