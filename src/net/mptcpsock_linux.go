@@ -5,6 +5,7 @@
 package net
 
 import (
+	"context"
 	"errors"
 	"internal/poll"
 	"sync"
@@ -37,4 +38,13 @@ func initMPTCPavailable() {
 	default:
 		mptcpAvailable = true
 	}
+}
+
+func (sd *sysDialer) dialMPTCP(ctx context.Context, laddr, raddr *TCPAddr) (*TCPConn, error) {
+	// Fallback to dialTCP if Multipath TCP isn't supported on this operating system.
+	if !supportsMultipathTCP() {
+		return sd.dialTCP(ctx, laddr, raddr)
+	}
+
+	return sd.doDialTCPProto(ctx, laddr, raddr, _IPPROTO_MPTCP)
 }
