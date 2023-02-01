@@ -46,7 +46,15 @@ func (sd *sysDialer) dialMPTCP(ctx context.Context, laddr, raddr *TCPAddr) (*TCP
 		return sd.dialTCP(ctx, laddr, raddr)
 	}
 
-	return sd.doDialTCPProto(ctx, laddr, raddr, _IPPROTO_MPTCP)
+	conn, err := sd.doDialTCPProto(ctx, laddr, raddr, _IPPROTO_MPTCP)
+	if err == nil {
+		return conn, nil
+	}
+
+	// Possible MPTCP specific error: ENOPROTOOPT (sysctl net.mptcp.enabled=0)
+	// But just in case MPTCP is blocked differently (SELinux, etc.), just
+	// retry with "plain" TCP.
+	return sd.dialTCP(ctx, laddr, raddr)
 }
 
 func (sl *sysListener) listenMPTCP(ctx context.Context, laddr *TCPAddr) (*TCPListener, error) {
@@ -55,5 +63,13 @@ func (sl *sysListener) listenMPTCP(ctx context.Context, laddr *TCPAddr) (*TCPLis
 		return sl.listenTCP(ctx, laddr)
 	}
 
-	return sl.listenTCPProto(ctx, laddr, _IPPROTO_MPTCP)
+	dial, err := sl.listenTCPProto(ctx, laddr, _IPPROTO_MPTCP)
+	if err == nil {
+		return dial, nil
+	}
+
+	// Possible MPTCP specific error: ENOPROTOOPT (sysctl net.mptcp.enabled=0)
+	// But just in case MPTCP is blocked differently (SELinux, etc.), just
+	// retry with "plain" TCP.
+	return sl.listenTCP(ctx, laddr)
 }
