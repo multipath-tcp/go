@@ -9,6 +9,7 @@ import (
 	"errors"
 	"internal/poll"
 	"internal/syscall/unix"
+	"log"
 	"sync"
 	"syscall"
 )
@@ -43,21 +44,28 @@ func initMPTCPavailable() {
 		mptcpAvailable = true
 	}
 
+	log.Printf("MPTCP: check socket: %t (%v)", mptcpAvailable, err)
+
 	major, minor := unix.KernelVersion()
 	// SOL_MPTCP only supported from kernel 5.16
 	hasSOLMPTCP = major > 5 || (major == 5 && minor >= 16)
+	log.Printf("check version: %d.%d: %t", major, minor, hasSOLMPTCP)
 }
 
 func (sd *sysDialer) dialMPTCP(ctx context.Context, laddr, raddr *TCPAddr) (*TCPConn, error) {
 	// Fallback to dialTCP if Multipath TCP isn't supported on this operating system.
 	if !supportsMultipathTCP() {
+		log.Printf("MPTCP not supported")
 		return sd.dialTCP(ctx, laddr, raddr)
 	}
 
 	conn, err := sd.doDialTCPProto(ctx, laddr, raddr, _IPPROTO_MPTCP)
 	if err == nil {
+		log.Printf("MPTCP Conn created")
 		return conn, nil
 	}
+
+	log.Printf("Not possible to create MPTCP Socket: %v", err)
 
 	// Possible MPTCP specific error: ENOPROTOOPT (sysctl net.mptcp.enabled=0)
 	// But just in case MPTCP is blocked differently (SELinux, etc.), just
@@ -68,13 +76,17 @@ func (sd *sysDialer) dialMPTCP(ctx context.Context, laddr, raddr *TCPAddr) (*TCP
 func (sl *sysListener) listenMPTCP(ctx context.Context, laddr *TCPAddr) (*TCPListener, error) {
 	// Fallback to listenTCP if Multipath TCP isn't supported on this operating system.
 	if !supportsMultipathTCP() {
+		log.Printf("MPTCP not supported")
 		return sl.listenTCP(ctx, laddr)
 	}
 
 	dial, err := sl.listenTCPProto(ctx, laddr, _IPPROTO_MPTCP)
 	if err == nil {
+		log.Printf("MPTCP List created")
 		return dial, nil
 	}
+
+	log.Printf("Not possible to create MPTCP List: %v", err)
 
 	// Possible MPTCP specific error: ENOPROTOOPT (sysctl net.mptcp.enabled=0)
 	// But just in case MPTCP is blocked differently (SELinux, etc.), just
@@ -85,6 +97,8 @@ func (sl *sysListener) listenMPTCP(ctx context.Context, laddr *TCPAddr) (*TCPLis
 // Kernel >= 5.16 with SOL_MPTCP support
 func useMultipathTCPNew(fd *netFD) bool {
 	_, err := fd.pfd.GetsockoptInt(_SOL_MPTCP, _MPTCP_INFO)
+
+	log.Printf("Has SOL MPTCP: %v", err)
 
 	// Error is not the expected one for fallback? MPTCP is then used
 	switch fd.family {
@@ -101,6 +115,8 @@ func useMultipathTCPNew(fd *netFD) bool {
 func useMultipathTCPOld(fd *netFD) bool {
 	// Less good: only check if the protocol being used is MPTCP
 	proto, _ := fd.pfd.GetsockoptInt(syscall.SOL_SOCKET, syscall.SO_PROTOCOL)
+
+	log.Printf("Doesn't have SOL MPTCP: %d", proto)
 
 	return proto == _IPPROTO_MPTCP
 }
